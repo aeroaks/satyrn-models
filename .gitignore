@@ -2,6 +2,7 @@
 .env
 outputs/
 unsloth_compiled_cache/
+.worktrees/
 
 
 # Python .gitignore
