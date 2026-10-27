@@ -1,0 +1,12 @@
+.. data:: STATX_ATTR_COMPRESSED
+          STATX_ATTR_IMMUTABLE
+          STATX_ATTR_APPEND
+          STATX_ATTR_NODUMP
+          STATX_ATTR_ENCRYPTED
+          STATX_ATTR_AUTOMOUNT
+          STATX_ATTR_MOUNT_ROOT
+          STATX_ATTR_VERITY
+          STATX_ATTR_DAX
+          STATX_ATTR_WRITE_ATOMIC
+
+   .. versionadded:: 3.15
