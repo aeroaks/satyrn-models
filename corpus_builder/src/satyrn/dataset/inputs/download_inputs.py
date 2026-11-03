@@ -1,8 +1,11 @@
 """Download the PEP and whatsnew source documents used by dataset generation."""
 
+import json
 import logging
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 import click
 
@@ -45,6 +48,21 @@ SOURCES = {
 }
 
 
+def get_repository_commit(source_url: str) -> str:
+    """Return the commit SHA currently referenced by the source URL's main branch."""
+    path_parts = urlparse(source_url).path.strip("/").split("/")
+    if len(path_parts) < 4 or path_parts[2] != "main":
+        raise click.ClickException(f"Unexpected raw GitHub source URL: {source_url}")
+
+    owner, repository = path_parts[:2]
+    api_url = f"https://api.github.com/repos/{owner}/{repository}/commits/main"
+    try:
+        with urllib.request.urlopen(api_url, timeout=30) as response:
+            return json.load(response)["sha"]
+    except (OSError, json.JSONDecodeError, KeyError) as error:
+        raise click.ClickException(f"Could not resolve main commit for {owner}/{repository}.") from error
+
+
 @click.command("download-inputs")
 @click.argument("target_version", type=click.Choice(sorted(SOURCES)))
 def main(target_version: str) -> None:
@@ -52,10 +70,26 @@ def main(target_version: str) -> None:
     for category, urls in SOURCES[target_version].items():
         out_dir = Path(__file__).parents[5] / "datasets" / f"python{target_version}" / "input" / category
         out_dir.mkdir(parents=True, exist_ok=True)
+        commits_by_repository = {}
+        documents = {}
         for name, url in urls.items():
+            repository = "/".join(urlparse(url).path.strip("/").split("/")[:2])
+            if repository not in commits_by_repository:
+                commits_by_repository[repository] = get_repository_commit(url)
+            source_commit = commits_by_repository[repository]
+            pinned_url = url.replace("/main/", f"/{source_commit}/", 1)
+
             dest = out_dir / f"{name}.rst"
             logger.info("Python %s: Downloading %s", target_version, name)
-            urllib.request.urlretrieve(url, dest)
+            urllib.request.urlretrieve(pinned_url, dest)
+            documents[dest.name] = {
+                "source_url": url,
+                "source_commit": source_commit,
+                "fetched_at": datetime.now(timezone.utc).isoformat(),
+            }
+
+        manifest = {"target_python_version": target_version, "documents": documents}
+        (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
 
 if __name__ == "__main__":

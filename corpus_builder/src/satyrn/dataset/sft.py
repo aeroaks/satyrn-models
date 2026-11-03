@@ -2,6 +2,7 @@
 
 import json
 import logging
+import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -26,6 +27,23 @@ from satyrn.dataset.utils.preview import print_dataset_line, print_ideas
 from satyrn.dataset.utils.sandbox import Sandbox, get_predecessor_python_version, remove_leftover_containers
 
 logger = logging.getLogger(__name__)
+MODEL_NAME = "deepseek-v4-flash"
+
+
+def get_generator_commit() -> str:
+    """Return the current Git revision of the Satyrn models repository."""
+    repository = Path(__file__).resolve().parents[4]
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repository), "rev-parse", "HEAD"],
+            capture_output=True,
+            check=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        message = f"Could not determine generator revision from Git checkout at {repository}."
+        raise click.ClickException(message) from error
+    return result.stdout.strip()
 
 
 def generate_code_block(model: Model, idea: Idea, sandbox: Sandbox, predecessor_sandbox: Sandbox) -> dict:
@@ -308,7 +326,14 @@ In `judgement`, explain your decision.
         raise ValueError(f"Judge rejected conversation: {response['judgement']}")
 
 
-def build_dataset_line(model: Model, idea: Idea, sandbox: Sandbox, predecessor_sandbox: Sandbox) -> dict | None:
+def build_dataset_line(
+    model: Model,
+    idea: Idea,
+    sandbox: Sandbox,
+    predecessor_sandbox: Sandbox,
+    model_name: str,
+    generator_commit: str,
+) -> dict | None:
     """Return a verified dataset line for idea, or None if it was rejected."""
     try:
         code_block = generate_code_block(model, idea, sandbox, predecessor_sandbox)
@@ -327,6 +352,9 @@ def build_dataset_line(model: Model, idea: Idea, sandbox: Sandbox, predecessor_s
         "filename": idea.doc_path.name,
         "pep": pep_identifier(idea.doc_path),
         "python_version": idea.python_version,
+        "doc_commit": idea.doc_provenance.get("source_commit") if idea.doc_provenance else None,
+        "model_name": model_name,
+        "generator_commit": generator_commit,
         "idea": idea.description,
         "code": code_block["code"],
         "trace": code_block["trace"],
@@ -356,7 +384,8 @@ def build_dataset_line(model: Model, idea: Idea, sandbox: Sandbox, predecessor_s
 @click.option("--workers", type=click.IntRange(min=1), default=1, help="Number of lines to generate in parallel.")
 def main(input_path: Path, output_path: Path, python_version: str, preview: bool, workers: int) -> None:
     """Generate an SFT dataset for every doc file under input_path."""
-    model = get_llm("deepseek", "deepseek-v4-flash")
+    model = get_llm("deepseek", MODEL_NAME)
+    generator_commit = get_generator_commit()
     sandbox = Sandbox(python_version)
     predecessor_sandbox = Sandbox(get_predecessor_python_version(python_version))
     file_workers, idea_workers = split_workers(workers)
@@ -373,7 +402,18 @@ def main(input_path: Path, output_path: Path, python_version: str, preview: bool
 
         # Process each conversation idea for the current doc file
         with ThreadPoolExecutor(max_workers=idea_workers) as executor:
-            futures = [executor.submit(build_dataset_line, model, idea, sandbox, predecessor_sandbox) for idea in ideas]
+            futures = [
+                executor.submit(
+                    build_dataset_line,
+                    model,
+                    idea,
+                    sandbox,
+                    predecessor_sandbox,
+                    MODEL_NAME,
+                    generator_commit,
+                )
+                for idea in ideas
+            ]
             for future in as_completed(futures):
                 dataset_line = future.result()
                 if dataset_line is None:

@@ -1,11 +1,14 @@
 """Collect CPython documentation sections tied to a specific version's changes."""
 
+import json
 import logging
 import pickle
 import re
+import subprocess
 import tempfile
 from collections import defaultdict
 from collections.abc import Iterator
+from datetime import datetime, timezone
 from pathlib import Path
 
 import click
@@ -17,6 +20,21 @@ logger = logging.getLogger(__name__)
 
 DOCTREE_CACHE_DIRECTORY = Path(tempfile.gettempdir()) / "satyrn-cpython-sphinx-cache"
 MAX_SECTION_LINES = 500
+
+
+def get_source_commit(doc_directory: Path) -> str:
+    """Return the Git revision of the CPython checkout containing doc_directory."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(doc_directory), "rev-parse", "HEAD"],
+            capture_output=True,
+            check=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        message = f"Could not determine source revision: {doc_directory} is not a Git checkout."
+        raise click.ClickException(message) from error
+    return result.stdout.strip()
 
 
 def parse_docs(doc_directory: Path) -> Sphinx:
@@ -137,6 +155,7 @@ def main(target_version: str, doc_directory: Path) -> None:
             f"No conf.py in {doc_directory}; expected CPython's Doc/ directory (e.g. cpython/Doc)."
         )
 
+    source_commit = get_source_commit(doc_directory)
     app = parse_docs(doc_directory)
     logger.info("Read %d documents", len(app.env.all_docs))
 
@@ -177,6 +196,13 @@ def main(target_version: str, doc_directory: Path) -> None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text("\n\n----\n\n".join(texts))
         logger.info("Wrote %s", output_path)
+
+    manifest = {
+        "source_commit": source_commit,
+        "target_python_version": target_version,
+        "extracted_at": datetime.now(timezone.utc).isoformat(),
+    }
+    (output_directory / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
     logger.info("Wrote %d files to %s", len(sections_by_document), output_directory)
 

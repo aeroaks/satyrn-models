@@ -39,6 +39,32 @@ class Idea:
     doc_path: Path
     description: str
     python_version: str
+    doc_provenance: dict[str, str] | None = None
+
+
+def get_doc_provenance(doc_path: Path) -> dict[str, str] | None:
+    """Find the closest manifest entry or source-level provenance for doc_path."""
+    for directory in doc_path.parents:
+        manifest_path = directory / "manifest.json"
+        if not manifest_path.is_file():
+            continue
+        try:
+            manifest = json.loads(manifest_path.read_text())
+        except (OSError, json.JSONDecodeError) as error:
+            raise click.ClickException(f"Could not read provenance manifest {manifest_path}.") from error
+        if not isinstance(manifest, dict):
+            raise click.ClickException(f"Invalid provenance manifest {manifest_path}: expected a JSON object.")
+
+        documents = manifest.get("documents", {})
+        if isinstance(documents, dict):
+            relative_path = doc_path.relative_to(directory).as_posix()
+            for key in (relative_path, doc_path.name):
+                entry = documents.get(key)
+                if isinstance(entry, dict):
+                    return entry
+        if isinstance(manifest.get("source_commit"), str):
+            return manifest
+    return None
 
 
 def pep_identifier(doc_path: Path) -> str | None:
@@ -71,12 +97,13 @@ ideas for short, self-contained code blocks that would demonstrate the described
         },
         "required": ["ideas"],
     }
+    doc_provenance = get_doc_provenance(doc_path)
     context = Context()
     context.system_prompt = SYSTEM_PROMPT
     context.add(doc_path.name, doc_path)
     context.set_json_schema(schema)
     response = model.generate(prompt, context, thinking=True)
-    return [Idea(doc_path, description, python_version) for description in response["ideas"]]
+    return [Idea(doc_path, description, python_version, doc_provenance) for description in response["ideas"]]
 
 
 def prepare_output_file(output_path: Path) -> None:
