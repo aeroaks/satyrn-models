@@ -19,5 +19,15 @@ Models go through three training stages, building on one another:
 
 ## Quickstart
 
+Environments are managed with [Pixi](https://pixi.sh). Each named environment installs one CLI, so dataset
+generation and model training use separate environments. For example, to try the dataset CLI:
+
+```sh
+pixi install -e dataset-local
+pixi run -e dataset-local satyrn-dataset --help
+```
+
+For target- and model-specific instructions:
+
 1. Generating datasets - see [docs/dataset_generator.md](docs/dataset_generator.md).
 2. Fine-tuning models - see [docs/trainer_unsloth.md](docs/trainer_unsloth.md).

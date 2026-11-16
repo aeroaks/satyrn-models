@@ -4,15 +4,19 @@ Use the `corpus_builder` package to generate fine-tuning datasets.
 
 ## Install
 
-Install the `satyrn-dataset` command into your environment from the `corpus_builder` package.
-
-Activate a Python virtual environment and install the package. Use an editable install (`-e`) 
-if you plan to change the `corpus_builder` code, so edits take effect without reinstalling:
+Install the `satyrn-dataset` command with the `dataset-local` [Pixi](https://pixi.sh) environment. It installs
+the `corpus_builder` package (editable, so code edits take effect without reinstalling) with Python 3.13 and
+nothing from the trainer package:
 
 ```sh
-$ source /path/to/venv/bin/activate
-(venv) $ pip install -e ./corpus_builder
+pixi install -e dataset-local
+pixi run -e dataset-local satyrn-dataset --help
+pixi run -e dataset-local satyrn-dataset cpt --help
 ```
+
+Run the other `satyrn-dataset` commands in this guide the same way, prefixing them with
+`pixi run -e dataset-local`. Dataset generation and model training use separate Pixi environments; see
+[trainer_unsloth.md](trainer_unsloth.md) for training.
 
 ## Collecting input material
 
