@@ -4,19 +4,21 @@ Use the `satyrn-unsloth` package to fine-tune models with Unsloth.
 
 ## Target environments
 
-A target is supported only after its package environment resolves and the CLI starts there. "Reported" values come from repository or issue comments and were not re-verified; "not recorded" means no verified value is available.
+A target is supported only after its package environment resolves and the CLI starts there; no target is supported yet. "Operator-verified" values were supplied by the operator from command output. "Reported" values come from repository or issue comments and were not re-verified. "Not recorded" means no verified value is available.
 
 | Target | Platform | Python | GPU/driver | CLI | Model profiles |
 |---|---|---|---|---|---|
 | Local development host | Linux x86_64 (observed) | 3.12.3 (observed); below both CLI floors (`satyrn-dataset` `>=3.13`, `satyrn-unsloth` `>=3.13.9,<3.14`) | No `nvidia-smi` observed; no GPU training target | Dataset CLI development only, once a Python `>=3.13` environment is available; trainer CLI not supported (no GPU observed) | None for training |
-| Molab | Not recorded in this session | 3.13.11 (reported; fits `satyrn-unsloth`) | CUDA 13.2 driver (reported); GPU model and CUDA wheel source not recorded | Trainer CLI (`satyrn-unsloth`); dataset CLI not recorded | Not recorded; not verified |
+| Molab | Linux x86_64 (operator-verified) | 3.13.11 (operator-verified; fits `satyrn-unsloth`) | NVIDIA RTX PRO 6000 Blackwell Server Edition, driver 595.71.05 (operator-verified); CUDA 13.2 driver previously reported, not re-verified; CUDA wheel source not provided | Trainer CLI (`satyrn-unsloth`) intended, not verified; dataset CLI not recorded | Not verified; environment resolution and CLI startup not tested |
 | RunPod | Not recorded | Not recorded | Not recorded; CUDA 12.8 or 13.0 wheel source not determined | Not recorded | Not recorded; not verified |
 
-Model profile requirements recorded in `trainer/unsloth/configs/model`:
+Model profile requirements recorded in `trainer/unsloth/configs/model`. None of these stacks is verified as a Pixi environment yet.
 
-- Mellum 2 (`mellum2-12b-a2.5`): `transformers==5.15.0`.
-- Gemma 4 (`gemma-4-26B-A4B-it`): `transformers==5.5.0`.
-- Qwen 3.6 (`qwen3.6-27b`, `qwen3.6-35b-a3b`): `transformers==5.3.0`; the 35B config also lists `trl 0.22.2` and `torch 2.8.0`, which conflict with this guide's `torch==2.11.0`.
+- Mellum 2 (`mellum2-12b-a2.5`): tested with `transformers==5.15.0`; the minimum is `transformers>=5.10.1`. 5.15.0 is the tested version, not a universal requirement.
+- Gemma 4 (`gemma-4-26B-A4B-it`): `transformers==5.5.0`; the guide notes 5.15.0 does not work with it.
+- Qwen 3.6, a separate stack from the Torch 2.11 profiles above (not verified):
+  - `qwen3.6-27b`: `transformers 5.3.0`, plus flash-linear-attention and causal_conv1d; no TRL or Torch version recorded.
+  - `qwen3.6-35b-a3b`: `transformers 5.3.0`, `trl 0.22.2`, and `torch 2.8.0`, plus flash-linear-attention and causal_conv1d 1.6.0, which builds only against torch 2.8.0.
 - Qwen 2.5 0.5B, Qwen 3 Coder 30B-A3B, Qwen 3.8 27B, and Ornith 1.5 9B: no Transformers version recorded in their configs.
 
 ## Install
