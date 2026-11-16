@@ -2,6 +2,23 @@
 
 Use the `satyrn-unsloth` package to fine-tune models with Unsloth.
 
+## Target environments
+
+A target is supported only after its package environment resolves and the CLI starts there. "Reported" values come from repository or issue comments and were not re-verified; "not recorded" means no verified value is available.
+
+| Target | Platform | Python | GPU/driver | CLI | Model profiles |
+|---|---|---|---|---|---|
+| Local development host | Linux x86_64 (observed) | 3.12.3 (observed); below both CLI floors (`satyrn-dataset` `>=3.13`, `satyrn-unsloth` `>=3.13.9,<3.14`) | No `nvidia-smi` observed; no GPU training target | Dataset CLI development only, once a Python `>=3.13` environment is available; trainer CLI not supported (no GPU observed) | None for training |
+| Molab | Not recorded in this session | 3.13.11 (reported; fits `satyrn-unsloth`) | CUDA 13.2 driver (reported); GPU model and CUDA wheel source not recorded | Trainer CLI (`satyrn-unsloth`); dataset CLI not recorded | Not recorded; not verified |
+| RunPod | Not recorded | Not recorded | Not recorded; CUDA 12.8 or 13.0 wheel source not determined | Not recorded | Not recorded; not verified |
+
+Model profile requirements recorded in `trainer/unsloth/configs/model`:
+
+- Mellum 2 (`mellum2-12b-a2.5`): `transformers==5.15.0`.
+- Gemma 4 (`gemma-4-26B-A4B-it`): `transformers==5.5.0`.
+- Qwen 3.6 (`qwen3.6-27b`, `qwen3.6-35b-a3b`): `transformers==5.3.0`; the 35B config also lists `trl 0.22.2` and `torch 2.8.0`, which conflict with this guide's `torch==2.11.0`.
+- Qwen 2.5 0.5B, Qwen 3 Coder 30B-A3B, Qwen 3.8 27B, and Ornith 1.5 9B: no Transformers version recorded in their configs.
+
 ## Install
 
 Prerequisites:
