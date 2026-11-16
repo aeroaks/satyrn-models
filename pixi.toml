@@ -50,12 +50,14 @@ mslk = "==1.1.1"
 
 [feature.qwen36-27b.pypi-dependencies]
 transformers = "==5.3.0"
+torch = "==2.11.0"
 flash-linear-attention = "*"
 causal-conv1d = "*"
 
 [feature.qwen36-27b.pypi-options.dependency-overrides]
-# No TRL/Torch version is recorded for this model; reuse the repo-wide uv.toml overrides
-# (trl#6105 fix, mslk build for torch 2.11) that the existing Qwen workflows already apply.
+# The Qwen3.6-27B config does not record Torch or TRL pins. These are unverified candidate
+# settings inherited from the current uv.toml: trl 1.7.0 (trl#6105 fix) and mslk 1.1.1 (the
+# build for torch 2.11, hence the explicit torch==2.11.0 above). Not tested on any target.
 trl = "==1.7.0"
 mslk = "==1.1.1"
 
@@ -70,16 +72,11 @@ causal-conv1d = "==1.6.0"
 # Config records trl 0.22.2; unsloth pins trl==0.24.0.
 trl = "==0.22.2"
 
-# Unassigned option: PyTorch CUDA 12.8 wheel index (docs/trainer_unsloth.md, 570-series drivers).
-# No environment composes it because no target is verified to need it; extra-index-urls merge
-# across an environment's features, so only add it to environments that need it.
-[feature.cu128.pypi-options]
-extra-index-urls = ["https://download.pytorch.org/whl/cu128"]
-index-strategy = "unsafe-best-match"
-
+# molab-* are candidate lock environments only: resolution and import checks do not establish
+# Molab runtime support.
 [environments]
 dataset-local = { features = ["dataset"], no-default-feature = true }
-molab-mellum = { features = ["trainer", "molab", "mellum"], no-default-feature = true, solve-group = "mellum" }
-molab-gemma = { features = ["trainer", "molab", "gemma"], no-default-feature = true, solve-group = "gemma" }
-molab-qwen36-27b = { features = ["trainer", "molab", "qwen36-27b"], no-default-feature = true, solve-group = "qwen36-27b" }
-molab-qwen36-35b = { features = ["trainer", "molab", "qwen36-35b"], no-default-feature = true, solve-group = "qwen36-35b" }
+molab-mellum = { features = ["trainer", "molab", "mellum"], no-default-feature = true }
+molab-gemma = { features = ["trainer", "molab", "gemma"], no-default-feature = true }
+molab-qwen36-27b = { features = ["trainer", "molab", "qwen36-27b"], no-default-feature = true }
+molab-qwen36-35b = { features = ["trainer", "molab", "qwen36-35b"], no-default-feature = true }
