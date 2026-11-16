@@ -1,83 +1,107 @@
-# uv Workspace for Dataset and Training CLIs
+# Pixi Environments for Dataset and Training CLIs
 
 ## Goal
 
-Provide a reproducible uv workspace for developing and running the dataset-builder and Unsloth-training CLIs locally and on Molab, while keeping their dependency choices and operational commands explicit.
+Provide reproducible, explicitly selected Pixi environments for local development, Molab, and RunPod while keeping the dataset and training CLI dependency sets separate.
 
 ## Context
 
-Issue #9 asks to simplify development to `uv sync` because the repository contains separate dependency sets. The repository currently has three project manifests:
+Issue #9 asks to simplify development because the repository contains separate dependency sets. The repository currently has three project manifests:
 
 - `corpus_builder/pyproject.toml` defines `satyrn-corpus-builder`, Python `>=3.13`, and the `satyrn-dataset` command.
 - `trainer/unsloth/pyproject.toml` defines `satyrn-unsloth`, Python `>=3.13.9,<3.14`, and the `satyrn-unsloth` command.
 - `spikes/pep750/pyproject.toml` defines a Python `>=3.14` experiment and is not part of the production dataset/training workflow.
 
-The dataset CLI exposes `cpt`, `sft`, `rl`, `download-inputs`, and `collect-doc-changes`. Its entrypoint imports and registers all command modules at startup, so a dataset-only environment still needs the dataset package's complete runtime dependency set. The trainer CLI imports its training, tracking, and evaluation stack, including Unsloth, PyTorch, Transformers, TRL, Hugging Face Datasets, Hydra, MLflow, and Inspect.
+The dataset CLI exposes `cpt`, `sft`, `rl`, `download-inputs`, and `collect-doc-changes`. Its entrypoint imports and registers all command modules at startup, so a dataset environment needs the dataset package's complete runtime dependency set. The trainer CLI imports its training, tracking, and evaluation stack, including Unsloth, PyTorch, Transformers, TRL, Hugging Face Datasets, Hydra, MLflow, and Inspect.
 
-Training versions are not one-size-fits-all. The trainer documentation calls for `trl==1.7.0`; Mellum 2 was tested with `transformers==5.15.0`, while Gemma 4 uses `transformers==5.5.0`. Both use Torch 2.11 and torchvision 0.26, while the appropriate CUDA wheel source depends on the machine/driver. Molab's reported working environment uses Python 3.13.11 and CUDA 13.2.
+Training versions are not one-size-fits-all. The trainer documentation calls for `trl==1.7.0`; Mellum 2 was tested with `transformers==5.15.0`, while Gemma 4 uses `transformers==5.5.0`. Both use `torch==2.11.0` and `torchvision==0.26.0`, while the appropriate CUDA wheel source depends on the machine/driver. The repository's reported Molab setup uses Python 3.13.11 and a CUDA 13.2 driver. The exact local and RunPod operating-system, Python, driver, and CUDA constraints have not yet been recorded.
+
+Pixi supports both `pixi.toml` and `pyproject.toml` manifests, PyPI dependencies through uv, multiple named environments, and platform-specific lock resolution. This supports the requirement for target-specific environments while preserving the existing Python package projects.
 
 ## Design
 
-### Workspace boundary and Python policy
+### Package and environment boundaries
 
-Create a repository-root uv workspace containing only `corpus_builder` and `trainer/unsloth`. Keep `spikes/pep750` outside the workspace: its Python `>=3.14` requirement is incompatible with the trainer's `<3.14` bound, and it is an experiment rather than a production CLI package.
+Create a repository-root `pixi.toml` and `pixi.lock` to manage environments; do not replace the two package manifests. Keep `corpus_builder/pyproject.toml` and `trainer/unsloth/pyproject.toml` as the sources of package metadata, runtime dependencies, and console entry points.
 
-The workspace Python range must reflect the intersection required by its members: `>=3.13.9,<3.14`. Developers on both local machines and Molab should use a Python version in that range. The workspace root will be a non-package coordinator; the existing member projects remain the installable packages and retain their own dependency declarations.
+Every named environment must include exactly one CLI package: either `satyrn-corpus-builder` or `satyrn-unsloth`, never both. This prevents the two packages' conflicting requirements from being forced into the same environment. Use Pixi features to share common setup and compose target-specific dependencies, but define named environments for the supported workflows so users select them explicitly.
 
-### Dependency and lockfile policy
+At minimum, define a dataset environment and separate training environments for local, Molab, and RunPod. Model-specific training selections (Mellum and Gemma) must remain separate whenever their Transformers requirements differ. Add dataset environments per deployment target only if inventory shows those targets need different dataset dependencies or Python versions.
 
-Use one repository-root `uv.lock` to resolve the two workspace members together. Keep package-specific runtime and development dependencies in their respective `pyproject.toml` files. Audit direct imports in the trainer package and declare libraries used directly by its code rather than relying on incidental transitive dependencies.
+Keep `spikes/pep750` outside these CLI environments. Its Python `>=3.14` requirement is incompatible with the trainer's `<3.14` bound, and it is an experiment rather than a production CLI package.
 
-Do not impose one global Transformers version: the documented Mellum and Gemma workflows require different versions. Represent model-specific versions and CUDA wheel-source choices as explicit training profiles or documented, reproducible environment selections. Use uv resolver overrides only for verified metadata conflicts, and validate that an override needed for TRL does not invalidate either model workflow. Do not silently rewrite upstream package metadata or upgrade Unsloth as part of this issue.
+### Target inventory and Python policy
 
-### Explicit user workflows
+Before finalizing platform pins, record for local, Molab, and RunPod:
 
-The documentation will show package-scoped operations for normal work and a full-workspace operation for users who intentionally need both packages installed:
+- operating system and architecture;
+- Python version available to the job;
+- GPU model and NVIDIA driver version, if a GPU is used;
+- required CUDA wheel source/runtime;
+- which CLI and model profiles the target must run.
+
+The trainer package requires Python `>=3.13.9,<3.14`; Molab's recorded Python 3.13.11 fits. The dataset package independently allows Python `>=3.13`. Keep these constraints in the package metadata and select compatible Python versions per Pixi environment rather than imposing a workspace-wide Python intersection. Do not claim support for a target platform until its environment resolves and the relevant CLI starts there.
+
+### Dependency and lock policy
+
+Use Pixi's PyPI dependency support for the existing Python packages and retain the current package dependency declarations. Use Conda packages only for system/native dependencies that are needed and available from the selected channels; do not install the same library through both Conda and PyPI in one environment.
+
+Keep the following training requirements explicit:
+
+- `trl==1.7.0`;
+- Mellum: `transformers==5.15.0`;
+- Gemma: `transformers==5.5.0`;
+- `torch==2.11.0` and `torchvision==0.26.0`;
+- PyPI's Torch 2.11 CUDA 13.0 (`cu130`) wheel path and the explicit PyTorch CUDA 12.8 (`cu128`) index where the target driver requires it.
+
+Pixi does not remove upstream dependency metadata conflicts by itself. Prototype the Unsloth bounds against the desired TRL/Transformers profiles before choosing a supported PyPI override or metadata strategy. Do not globally force one Transformers version, upgrade Unsloth, or silently change model behavior. Keep the environment profiles and resulting lock resolution inspectable and reproducible.
+
+### User workflow and documentation
+
+Document the equivalent of package-scoped operations through named Pixi environments. The final environment names must reflect the verified target inventory; examples should follow this shape:
 
 ```sh
-# Dataset development and command discovery
-uv sync --package satyrn-corpus-builder
-uv run --package satyrn-corpus-builder satyrn-dataset --help
-uv run --package satyrn-corpus-builder satyrn-dataset cpt --help
+# Dataset-only environment
+pixi install -e dataset
+pixi run -e dataset satyrn-dataset --help
+pixi run -e dataset satyrn-dataset cpt --help
 
-# Training development and command discovery
-uv sync --package satyrn-unsloth
-uv run --package satyrn-unsloth satyrn-unsloth --help
-uv run --package satyrn-unsloth satyrn-unsloth --config-name experiment/py3.15
+# A training environment for a specific target and model profile
+pixi install -e molab-gemma
+pixi run -e molab-gemma satyrn-unsloth --help
 
-# Install all workspace packages when both environments are wanted
-uv sync --all-packages
+# Run a configured experiment after selecting the matching model environment
+pixi run -e molab-gemma satyrn-unsloth --config-name experiment/py3.15
 ```
 
-The training guide will retain explicit model and hardware guidance. It will show how the selected training profile relates to the required Transformers version and how to select the appropriate PyTorch wheel source for the local or Molab driver environment. Dataset generation will not require installing the trainer's GPU stack when the user selects the dataset package only.
+The trainer guide must explain how to choose the target environment, model profile, and CUDA wheel source. The dataset guide must show that its environment does not install the trainer's GPU stack. The README must link new users to these workflows.
 
-### CI and documentation
+### CI
 
-Update CI to use the workspace lock and uv-managed package installation instead of independently installing both editable projects with `uv pip`. Preserve the existing Ruff checks and test coverage. If Ruff is run as a uv tool, pin its existing version (`0.16.2`) explicitly. Do not add a new type-checking job or change the project's test scope as part of this issue.
-
-Update the dataset and training guides to replace hand-managed installation steps with the package-scoped workspace examples above, while preserving required API-key, Docker, model, and CUDA prerequisites.
+Update CI to install Pixi and use the lockfile. Run dataset tests in the dataset environment and trainer tests in a documented trainer profile so CI never combines the two CLI dependency sets. Preserve the existing Ruff checks and test coverage. Do not add a new type-checking job or broaden the CI matrix beyond the environments needed to validate this change.
 
 ## Success Criteria
 
-1. `uv lock --check` succeeds from the repository root with both production packages in one workspace lock.
-2. A Python version satisfying `>=3.13.9,<3.14` can sync and run the dataset CLI without installing the trainer package when using the package-scoped dataset workflow.
-3. The trainer package can be synced and its CLI launched through uv on the documented local and Molab setups.
-4. The Mellum and Gemma Transformers selections both resolve and remain explicitly documented; a change for one does not silently change the other.
-5. The documented CUDA wheel selection remains usable for the supported Molab and local driver cases.
-6. CI uses the root lock consistently and the existing lint and test jobs pass.
-7. A new contributor can follow the docs to choose dataset-only, trainer-only, or all-package setup without manually installing packages with pip.
+1. `pixi.lock` resolves the selected platforms and environments, and a lock check succeeds without modifying the lock.
+2. The dataset environment installs and runs `satyrn-dataset` without installing the trainer package or GPU stack.
+3. Each selected trainer environment installs and starts `satyrn-unsloth` without installing the dataset package.
+4. Local, Molab, and RunPod environment definitions use Python and CUDA choices verified for those targets; unknown target values are not guessed.
+5. The Mellum and Gemma Transformers selections both resolve in separate environments and remain explicitly documented.
+6. The `cu128` source is selected only for targets that require it; the default PyPI `cu130` path remains explicit.
+7. CI uses Pixi environments and the lockfile while existing lint and test jobs pass.
+8. A new contributor can install and run either CLI by selecting its environment, without manually installing packages with pip.
 
 ## Risks and Constraints
 
-- uv workspaces share a Python constraint and lockfile. The common Python range therefore excludes Python 3.14 even though the dataset package alone permits it.
-- The trainer's GPU dependencies are large and platform-sensitive. A full-workspace sync is intentionally distinct from the lightweight package-scoped dataset sync.
-- The trainer currently relies on some libraries that are imported by source but arrive transitively. Making these direct dependencies explicit may expose additional resolver conflicts.
-- Unsloth's declared bounds conflict with the issue comments' working TRL/Transformers versions. Any resolver override must be checked against both model profiles and both local and Molab environments.
-- A lockfile alone cannot guarantee that a CUDA wheel is compatible with every local driver; the docs must retain the explicit wheel-source selection.
+- Local and RunPod target details are not present in the repository; they must be obtained before those environments can be pinned.
+- Unsloth's declared bounds conflict with the issue comments' working TRL/Transformers versions. Pixi's PyPI resolution must be tested for a transparent, reproducible override strategy.
+- GPU wheel compatibility depends on host drivers and platform support. A successful lock is not proof of runtime CUDA compatibility.
+- Dataset and trainer environments must stay separate; adding both CLI packages to one environment would reintroduce the dependency conflict this design is meant to avoid.
+- Pixi's PyPI and Conda dependencies must not install duplicate versions of Torch, CUDA libraries, or other native packages into one environment.
 
 ## Out of Scope
 
-- Adding `spikes/pep750` to the workspace.
+- Adding `spikes/pep750` to production CLI environments.
 - Upgrading Unsloth or changing model-training behavior.
 - Adding a new type checker or broad CI redesign.
 - Replacing the existing dataset or training CLIs.
