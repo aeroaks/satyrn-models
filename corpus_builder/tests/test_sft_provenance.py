@@ -13,6 +13,7 @@ def test_sft_row_includes_document_model_and_generator_commits(monkeypatch) -> N
         Path("PEP815.rst"),
         "demonstrate the feature",
         "3.15",
+        "sft",
         doc_provenance={"source_commit": "a" * 40},
     )
     model = SimpleNamespace(model_name="deepseek-v4-flash")
