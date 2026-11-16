@@ -20,6 +20,13 @@ satyrn-unsloth = { path = "trainer/unsloth", editable = true }
 [feature.trainer.pypi-options.dependency-overrides]
 datasets = ">=4.8.5"
 
+# Tooling features: Ruff-only lint and pytest, composed with one package feature per test environment.
+[feature.lint.dependencies]
+ruff = "==0.16.2"
+
+[feature.test.dependencies]
+pytest = ">=9,<10"
+
 # Molab: operator-verified Python 3.13.11 (CUDA wheel source not yet verified, so none is configured).
 [feature.molab.dependencies]
 python = "==3.13.11"
@@ -80,3 +87,9 @@ molab-mellum = { features = ["trainer", "molab", "mellum"], no-default-feature =
 molab-gemma = { features = ["trainer", "molab", "gemma"], no-default-feature = true }
 molab-qwen36-27b = { features = ["trainer", "molab", "qwen36-27b"], no-default-feature = true }
 molab-qwen36-35b = { features = ["trainer", "molab", "qwen36-35b"], no-default-feature = true }
+
+# CI environments: each installs one CLI package. trainer-ci uses the Gemma profile as the
+# representative dependency set for trainer tests (transformers 5.5.0 matches the unsloth cap).
+dataset-ci = { features = ["dataset", "test"], no-default-feature = true }
+trainer-ci = { features = ["trainer", "gemma", "test"], no-default-feature = true }
+lint = { features = ["lint"], no-default-feature = true }

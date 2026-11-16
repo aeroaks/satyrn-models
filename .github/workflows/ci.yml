@@ -14,14 +14,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install ruff
-        run: pipx install ruff==0.16.2
+      - uses: prefix-dev/setup-pixi@v0.11.3
+        with:
+          pixi-version: v0.84.1
+          cache: true
+
+      - name: Install lint environment
+        run: pixi install --locked -e lint
 
       - name: Lint
-        run: ruff check trainer corpus_builder
+        run: pixi run -e lint ruff check trainer corpus_builder
 
       - name: Check formatting
-        run: ruff format --check trainer corpus_builder
+        run: pixi run -e lint ruff format --check trainer corpus_builder
 
   test:
     runs-on: ubuntu-latest
@@ -30,19 +35,22 @@ jobs:
         with:
           lfs: true
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: prefix-dev/setup-pixi@v0.11.3
         with:
-          python-version: "3.13"
-          activate-environment: true
-          enable-cache: true
-          prune-cache: false
-          cache-dependency-glob: "**/pyproject.toml"
+          pixi-version: v0.84.1
+          cache: true
 
-      - name: Install both modules
-        run: uv pip install -e './corpus_builder[dev]' -e './trainer/unsloth[dev]'
+      - name: Install dataset test environment
+        run: pixi install --locked -e dataset-ci
 
-      - name: Run tests
-        run: pytest -v
+      - name: Run dataset tests
+        run: pixi run -e dataset-ci pytest -v corpus_builder/tests
+
+      - name: Install trainer test environment
+        run: pixi install --locked -e trainer-ci
+
+      - name: Run trainer tests
+        run: pixi run -e trainer-ci pytest -v trainer/unsloth/tests
 
   frontend:
     runs-on: ubuntu-latest
