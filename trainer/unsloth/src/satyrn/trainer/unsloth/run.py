@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -53,8 +54,8 @@ def unsloth_init() -> None:
     transformers.trainer.DEFAULT_PROGRESS_CALLBACK = ProgressCallback
 
 
-def load_dataset(paths: str | list[str]) -> Dataset:
-    """Read one or more JSONL files into a single dataset."""
+def read_rows(paths: str | list[str]) -> list[dict]:
+    """Read the rows of one or more JSONL files."""
     if isinstance(paths, str):
         paths = [paths]
 
@@ -62,23 +63,29 @@ def load_dataset(paths: str | list[str]) -> Dataset:
     for path in paths:
         with Path(path).open() as fh:
             rows += [json.loads(line) for line in fh if line.strip()]
-    return Dataset.from_list(rows)
+    return rows
+
+
+def load_dataset(paths: str | list[str]) -> Dataset:
+    """Read one or more JSONL files into a single dataset."""
+    return Dataset.from_list(read_rows(paths))
 
 
 def render_conversations_into_text_field(
-    dataset: Dataset, tokenizer: PreTrainedTokenizerBase, enable_thinking: bool
+    rows: list[dict], tokenizer: PreTrainedTokenizerBase, enable_thinking: bool
 ) -> Dataset:
     """Render each prompt+completion row into the text column the trainer tokenizes."""
 
-    def render(row: dict) -> dict:
-        assistant = dict(row["completion"][0])
-        if enable_thinking:
-            assistant["reasoning_content"] = row["trace"]
-        return {"text": tokenizer.apply_chat_template(row["prompt"] + [assistant], tokenize=False)}
+    def render(row: dict) -> str:
+        completion = [dict(message) for message in row["completion"]]
+        if not enable_thinking:
+            for message in completion:
+                message.pop("reasoning_content", None)
+        elif "trace" in row:
+            completion[0]["reasoning_content"] = row["trace"]
+        return tokenizer.apply_chat_template(row["prompt"] + completion, tools=row.get("tools"), tokenize=False)
 
-    # A row still holding prompt and completion columns takes the trainer's prompt-completion
-    # path, which masks by prompt length and ignores the text column.
-    return dataset.map(render, remove_columns=dataset.column_names)
+    return Dataset.from_list([{"text": render(row)} for row in rows])
 
 
 def build_trainer(
@@ -154,7 +161,10 @@ def main(cfg: DictConfig) -> None:
         print("Usage: satyrn-unsloth --config-name experiment/<name>")
         return
 
-    log_path = Path(HydraConfig.get().runtime.output_dir, "run.log")
+    output_dir = Path(HydraConfig.get().runtime.output_dir)
+    log_path = output_dir / "run.log"
+    evals_dir = output_dir / "evals"
+    os.environ["INSPECT_LOG_DIR"] = str(evals_dir)
     with tee_output(log_path) as log_file:
         unsloth_init()
         load_secrets()
@@ -255,8 +265,8 @@ def main(cfg: DictConfig) -> None:
 
                 if config.datasets.sft is not None:
                     logger.info("Starting Supervised Fine-Tuning (SFT) stage")
-                    dataset = load_dataset(config.datasets.sft)
-                    dataset = render_conversations_into_text_field(dataset, tokenizer, config.model.enable_thinking)
+                    rows = read_rows(config.datasets.sft)
+                    dataset = render_conversations_into_text_field(rows, tokenizer, config.model.enable_thinking)
 
                     trainer = build_trainer("sft", model, tokenizer, dataset, config)
                     trainer = train_on_responses_only(
@@ -274,6 +284,8 @@ def main(cfg: DictConfig) -> None:
 
                 if config.datasets.rl is not None:
                     logger.info("Starting Reinforcement Learning (RL) stage")
+                    # SFTTrainer leaves output_router_logits on for MoE models, which breaks generation in GRPO
+                    model.config.get_text_config().output_router_logits = False
                     dataset = load_dataset(config.datasets.rl)
                     dataset = dataset.map(to_chat_prompt)
 
@@ -319,6 +331,8 @@ def main(cfg: DictConfig) -> None:
                 # Send the Hydra job log to the tracking server
                 log_file.flush()
                 mlflow.log_text(log_path.read_text(), "train.log")
+                if evals_dir.exists():
+                    mlflow.log_artifact(shutil.make_archive(str(evals_dir), "zip", evals_dir))
 
     mlflow.end_run()
 
