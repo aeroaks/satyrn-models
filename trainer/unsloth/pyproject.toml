@@ -6,6 +6,7 @@ requires-python = ">=3.13.9,<3.14"
 dependencies = [
     "unsloth==2026.8.18",
     "unsloth-zoo==2026.8.12",
+    "datasets",
     "pydantic",
     "python-dotenv",
     "hydra-core>=1.4.0.dev8",
@@ -17,6 +18,9 @@ dependencies = [
     "inspect-ai==0.3.260",
     "inspect-evals==0.19.0",
     "agent-client-protocol==0.12.1",
+    "torch",
+    "transformers",
+    "trl",
 ]
 
 [project.optional-dependencies]

@@ -5,6 +5,7 @@ description = "Satyrn Dataset Builder"
 requires-python = ">=3.13"
 dependencies = [
     "click",
+    "docutils",
     "flask>=3.1.3",
     "jsonschema",
     "openai",
