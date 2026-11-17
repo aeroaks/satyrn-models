@@ -31,3 +31,5 @@ For target- and model-specific instructions:
 
 1. Generating datasets - see [docs/dataset_generator.md](docs/dataset_generator.md).
 2. Fine-tuning models - see [docs/trainer_unsloth.md](docs/trainer_unsloth.md).
+3. Testing the Pixi environments locally and on Molab - see [docs/pixi_environment_testing.md](docs/pixi_environment_testing.md).
+4. Running on Molab notebooks - see [docs/trainer_molab.md](docs/trainer_molab.md).

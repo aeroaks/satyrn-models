@@ -1,5 +1,12 @@
 # Fine-tuning Satyrn language models for Python 3.15
 
+> [!WARNING]
+> **Legacy tutorial.** The setup in this tutorial is specific to Qwen 3.8 27B and uses uv. There is no Pixi environment or
+> verified runtime profile for Qwen 3.8 27B. For current setup and testing, see
+> [pixi_environment_testing.md](pixi_environment_testing.md), [trainer_unsloth.md](trainer_unsloth.md) and
+> [trainer_molab.md](trainer_molab.md). The `uv` commands below are historical and are not the supported way to
+> set up the environments.
+
 Satyrn models are local language models fine-tuned to work as agents in coding harnesses such as Pi and to write
 code using features of latest Python versions. This tutorial will show you how to train your own Satyrn model 
 and compare its evaluation scores with other runs.
@@ -7,7 +14,7 @@ and compare its evaluation scores with other runs.
 You can follow these steps in a terminal of any Linux machine with an Nvidia GPU, such as a
 [RunPod](https://www.runpod.io/) VM or a [Molab notebook](#run-the-tuning-in-a-marimo-notebook).
 
-## Prepare the environment
+## Prepare the environment (legacy uv setup)
 
 Run the following commands to install Git LFS (Large File Storage), which is needed to download datasets,
 and install all the Python versions used during training for model evaluation and reinforcement learning.
@@ -198,7 +205,7 @@ You will need a Molab account. Once you're signed in, create a new notebook and 
 
 <img src="images/molab_resources.png" alt="Molab notebook resources settings" width="610">
 
-Now open the notebook's terminal and run the commands from [Prepare the environment](#prepare-the-environment).
+Now open the notebook's terminal and run the commands from [Prepare the environment](#prepare-the-environment-legacy-uv-setup).
 
 #### Setup cells
 
